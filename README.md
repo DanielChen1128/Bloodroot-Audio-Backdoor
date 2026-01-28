@@ -30,51 +30,15 @@ Bloodroot is a novel **Watermark-as-Trigger** framework that repurposes audio wa
 
 ## 📂 Repository Structure
 
-The following structure outlines the components of this framework. **The full source code will be released sequentially.**
-
-* `checkpoints/`: Pretrained AudioSeal and Bloodroot LoRA weights.
-
-
-* `data/`: Scripts to download and prepare SC-10/30 and VoxCeleb datasets.
-
-
-* `models/`:
-  
-* `audioseal/`: Backbone AudioSeal implementation.
-
-
-* `bloodroot.py`: Bloodroot with LoRA adapters for decoder layers.
-
-
-
-
-* `scripts/`:
-  
-* `train_victim.py`: Training pipeline for SR and SID victim models.
-
-
-* `finetune_lora.py`: Bloodroot LoRA fine-tuning using joint loss (Eq. 5).
-
-
-* `poison_data.py`: Implementation of the generalized poisoning process (Algorithm 1).
-
-
-
-
-* `utils/`:
-  
-* `defenses.py`: Implementations of Low-pass filtering and Model Pruning defenses.
-
-
-* `metrics.py`: Calculation of BA, ASR, PESQ, and STOI.
+(Code coming soon)
 
 
 
 
 
-## 📖 Planned Usage (Code coming soon)
+## 📖 Planned Usage
 
-1. **Data Poisoning:** Generate poisoned datasets with controllable poisoning rate () and poison level ().
+1. **Data Poisoning:** Generate poisoned datasets with controllable poisoning rate and poison level.
 
 
 2. **LoRA Fine-tuning:** Optimize the watermark generator for better imperceptibility and robustness.
