@@ -16,8 +16,6 @@ Bloodroot is a novel **Watermark-as-Trigger** framework that repurposes audio wa
 
 
 
-(Overview of the Bloodroot framework )
-
 ## 🚀 Key Features
 
 * **High Stealthiness:** Achieves significant PESQ improvements (up to 32.5% in SR) compared to traditional audio backdoors.
