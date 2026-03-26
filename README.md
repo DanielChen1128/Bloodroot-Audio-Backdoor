@@ -9,7 +9,7 @@ Accepted by **ICASSP 2026**.
 
 Bloodroot is a novel **Watermark-as-Trigger** framework that repurposes audio watermarking as a stealthy and robust backdoor trigger for speech systems.
 
-* **Bloodroot*:** Uses AudioSeal to embed watermark triggers without fine-tuning.
+* **Bloodroot-FT:** Uses AudioSeal to embed watermark triggers without fine-tuning.
 
 
 * **Bloodroot:** Utilizes **Adversarial LoRA fine-tuning** to enhance the trigger's perceptual quality (PESQ/STOI) and robustness against defenses like filtering and pruning.
