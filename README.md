@@ -70,7 +70,7 @@ ASR after applying a 6th-order Butterworth low-pass filter ($f_{c}=3800\text{ Hz
 | Method | ASR (No Filter) | ASR (With Filter) |
 | :--- | :--- | :--- |
 | Ultrasonic | 97.26%  | 1.28%  |
-| **Bloodroot-FT** | 93.85% [ | **53.49%**  |
+| **Bloodroot-FT** | 93.85%  | **53.49%**  |
 
 ---
 
