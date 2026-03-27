@@ -1,0 +1,26 @@
+# Core dependencies for AudioSeal LoRA fine-tuning
+numpy>=1.20.0
+torch>=1.13.0
+torchaudio>=0.13.0
+omegaconf>=2.1.0
+julius>=0.2.0
+
+# Training and optimization
+fire>=0.4.0
+tqdm>=4.65.0
+
+# Audio processing
+soundfile>=0.12.0
+librosa>=0.9.0
+
+# Model management
+huggingface_hub>=0.14.0
+
+# Development tools (optional, for contributors)
+# Uncomment if you need development tools:
+# pytest>=7.0.0
+# mypy>=0.991
+# black>=22.0.0
+# isort>=5.12.0
+# flake8>=6.0.0
+# pre-commit>=3.0.0

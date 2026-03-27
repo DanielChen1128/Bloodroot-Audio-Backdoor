@@ -1,0 +1,57 @@
+# ==============================================================================
+# Bloodroot: Audio Backdoor Attack Framework
+# Requirements for full installation
+# ==============================================================================
+
+# Core Dependencies
+numpy>=1.22.0
+omegaconf
+pyyaml
+tqdm>=4.64.0
+einops
+
+# Audio Processing
+librosa>=0.9.1
+soundfile
+pysoundfile
+julius
+pydub
+
+# PyTorch (Install separately for CUDA support)
+# For CUDA 12.1:
+# pip install torch==2.1.0+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html
+# For CPU only:
+# pip install torch>=1.13.0 torchvision torchaudio
+torch>=1.13.0
+torchaudio
+
+# AudioSeal - Watermarking Framework
+audioseal
+
+# Audio Quality Metrics
+pesq
+pystoi
+
+# Natural Language Processing (for Speech Commands)
+nltk>=3.7
+
+# Visualization & Logging
+tensorboardX
+visualdl
+
+# Utilities
+munch
+click
+scikit-learn
+
+# Voice Conversion (Optional - for VSVC method)
+# parallel_wavegan
+
+# PaddlePaddle (Optional - for certain voice conversion features)
+# paddlepaddle-gpu>=2.2.2
+# paddlespeech==0.2.0
+
+# Development Dependencies (Optional)
+# pytest
+# black
+# flake8

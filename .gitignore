@@ -1,10 +1,27 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
 
 # C extensions
 *.so
+
+# Model checkpoints (large files)
+*.pth
+*.onnx
+*.h5
+*.pb
+checkpoints/
+!checkpoints/README.md
+
+# Datasets (too large for git)
+datasets/
+data/
+*.npy
+*.wav
+*.mp3
+*.flac
+*.ogg
 
 # Distribution / packaging
 .Python
@@ -205,3 +222,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# NFS temporary files
+.nfs*

@@ -1,0 +1,17 @@
+pip install torch==2.1.0+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html
+pip install paddlepaddle-gpu>=2.2.2
+pip install paddlespeech==0.2.0
+pip install pysoundfile
+pip install tqdm==4.64.0
+pip install nltk==3.7
+pip install numpy==1.22
+pip install librosa==0.9.1
+pip install visualdl
+pip install munch
+pip install pydub
+pip install pyyaml
+conda install -c conda-forge libsndfile -y
+pip install tensorboardX
+pip install einops
+pip install pesq pystoi numpy
+pip install audioseal
