@@ -27,10 +27,10 @@ setup(
     description="Watermark-as-Trigger: A Novel Framework for Stealthy Audio Backdoor Attacks",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/Bloodroot-Audio-Backdoor",
+    url="https://github.com/DanielChen1128/Bloodroot-Audio-Backdoor",
     project_urls={
         "Paper": "https://arxiv.org/abs/2510.07909",
-        "Bug Tracker": "https://github.com/yourusername/Bloodroot-Audio-Backdoor/issues",
+        "Bug Tracker": "https://github.com/DanielChen1128/Bloodroot-Audio-Backdoor/issues",
     },
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -42,8 +42,8 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ],
-    package_dir={"": "WaterMark"},
-    packages=find_packages(where="WaterMark"),
+    packages=find_packages(include=("SR", "SR.*")),
+    package_data={"SR": ["config/*.yaml"]},
     python_requires=">=3.8",
     install_requires=requirements,
     extras_require={

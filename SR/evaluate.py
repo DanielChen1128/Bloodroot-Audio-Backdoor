@@ -29,30 +29,21 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from collections import defaultdict
-import yaml
 
-# Import model architectures
-import models
-from datasets import SpeechCommandsDataset
+try:
+    from . import models
+    from .common import get_classes, load_config, resolve_path
+    from .datasets import SpeechCommandsDataset
+    from .poison_manifest import read_manifest, validate_manifest
+except ImportError:  # Direct script execution.
+    import models
+    from common import get_classes, load_config, resolve_path
+    from datasets import SpeechCommandsDataset
+    from poison_manifest import read_manifest, validate_manifest
 
 
 # Load configuration
-with open('./config/config.yaml', 'r') as f:
-    config = yaml.safe_load(f)
-
-
-# Class definitions
-SC10_CLASSES = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
-SC30_CLASSES = [
-    'yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go',
-    'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
-    'bed', 'bird', 'cat', 'dog', 'happy', 'house', 'marvin', 'sheila', 'tree', 'wow'
-]
-
-
-def get_classes(num_classes):
-    """Get class list based on number of classes."""
-    return SC10_CLASSES if num_classes == 10 else SC30_CLASSES
+config = load_config()
 
 
 def evaluate_benign_accuracy(model, dataloader, device, classes, verbose=True):
@@ -176,7 +167,7 @@ def evaluate_attack_success_rate(model, poison_test_path, target_label, device, 
                    if os.path.isdir(os.path.join(poison_test_path, d)) and not d.startswith('_')]
     
     # Filter to only valid classes
-    valid_classes = [c for c in all_classes if c in classes]
+    valid_classes = [c for c in all_classes if c in classes and c != target_label]
     
     # Test each class
     pbar = tqdm(valid_classes, desc="Testing classes")
@@ -295,6 +286,12 @@ def main():
         default=None,
         help='Target label for backdoor attack (required for attack mode)'
     )
+    parser.add_argument(
+        '--label_mode',
+        choices=['label-flip', 'clean-label'],
+        default=None,
+        help='Expected poison label mode (default: from config)'
+    )
     
     # Data paths (optional, will use config if not provided)
     parser.add_argument(
@@ -335,6 +332,8 @@ def main():
     if args.mode in ['attack', 'both'] and not args.target_label:
         args.target_label = config['trigger_gen']['target_label']
         print(f"Using target label from config: {args.target_label}")
+    if args.mode in ['attack', 'both'] and not args.label_mode:
+        args.label_mode = config['trigger_gen']['label_mode']
     
     # Verify target label
     if args.mode in ['attack', 'both']:
@@ -369,13 +368,13 @@ def main():
     
     # Evaluate benign accuracy
     if args.mode in ['clean', 'both']:
-        test_path = args.test_path or config['path']['benign_test_npypath']
-        test_dataset = SpeechCommandsDataset(test_path)
+        test_path = resolve_path(args.test_path or config['path']['benign_test_npypath'])
+        test_dataset = SpeechCommandsDataset(test_path, num_classes=args.num_classes)
         test_loader = DataLoader(
             test_dataset,
             batch_size=args.batch_size,
             shuffle=False,
-            num_workers=4
+            num_workers=0
         )
         
         results['clean'] = evaluate_benign_accuracy(
@@ -384,7 +383,13 @@ def main():
     
     # Evaluate attack success rate
     if args.mode in ['attack', 'both']:
-        poison_test_path = args.poison_test_path or config['path']['poison_test_path']
+        poison_test_path = resolve_path(args.poison_test_path or config['path']['poison_test_npypath'])
+        validate_manifest(
+            read_manifest(poison_test_path),
+            classes=classes,
+            target_label=args.target_label,
+            label_mode=args.label_mode,
+        )
         
         results['attack'] = evaluate_attack_success_rate(
             model, poison_test_path, args.target_label, device, classes, args.verbose

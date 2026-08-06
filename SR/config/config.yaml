@@ -6,6 +6,7 @@ path:
   benign_test_npypath: './datasets/test/'
   poison_train_path: './datasets/trigger_train/'
   poison_test_path: './datasets/trigger_test/'
+  poison_test_npypath: './datasets/test_poisoned/'
   mixed_train_npypath: './datasets/train_mixed/'  # Mixed dataset: clean + poisoned features
 librosa:
   sr: 22050
@@ -26,6 +27,7 @@ trigger_gen:
   sc_mode: sc10  # Options: 'sc10' or 'sc30'
   poison_proportion: 0.5
   target_label: 'left'
+  label_mode: 'label-flip'
   trigger_pattern: 'Bloodroot' 
   timbre_type: 236
   max_sample: 212

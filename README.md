@@ -1,106 +1,126 @@
 # Bloodroot: When Watermarking Turns Poisonous For Stealthy Backdoor
 
-<div align="center">
+Official PyTorch implementation of **"Bloodroot: When Watermarking Turns Poisonous for Stealthy Backdoor"**, accepted at **ICASSP 2026**.
 
-**Official PyTorch Implementation**
+**Authors:** Kuan-Yu Chen, Yi-Cheng Lin, Jeng-Lin Li, and Jian-Jiun Ding
 
-[![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2510.07909)
-[![Conference](https://img.shields.io/badge/ICASSP-2026-blue)](https://2026.ieeeicassp.org/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
+[Paper (arXiv:2510.07909)](https://arxiv.org/abs/2510.07909) | [ICASSP 2026](https://2026.ieeeicassp.org/) | [Apache-2.0 license](LICENSE)
 
-</div>
+## Overview
 
----
+Bloodroot studies a dual-use watermark-as-trigger framework for audio data poisoning. It embeds AudioSeal watermarks into a small portion of training samples so a victim speech model behaves normally on clean inputs but predicts a target class on triggered inputs.
 
-## 📄 About
+The paper evaluates speech recognition (SR) and speaker identification (SID), reporting relative PESQ improvements of up to 32.5% and 18.5%, respectively. At a 1% poisoning rate on SC-10, the reported ResNet-18 results are 95.01% benign accuracy and 95.09% attack success rate for base Bloodroot, and 94.82%/93.85% for Bloodroot-FT. Reported perceptual scores are PESQ 3.002/STOI 0.891 and PESQ 3.315/STOI 0.915, respectively. Under the paper's 3800 Hz low-pass defense, Bloodroot-FT retains 53.49% ASR. These are paper results, not bundled precomputed results.
 
-This repository contains the official implementation of **"Bloodroot: When Watermarking Turns Poisonous for Stealthy Backdoor"**, accepted at **ICASSP 2026**.
+## Method
 
-**Bloodroot** introduces a novel **Watermark-as-Trigger** framework that repurposes audio watermarking technology as imperceptible and robust backdoor triggers for speech systems. By leveraging pre-trained watermarking models (AudioSeal) and adversarial LoRA fine-tuning, Bloodroot achieves effective attack performance while maintaining significantly higher perceptual quality and robustness than traditional methods.
+- **Bloodroot (`base`)** uses the pretrained AudioSeal generator directly and defaults to the paper's output scale of 5.
+- **Bloodroot-FT (`lora-ft`)** inserts LoRA adapters into the AudioSeal decoder, loads a fine-tuned checkpoint, and defaults to output scale 1 because the fine-tuned generator already learns the strengthened watermark target. `--watermark-scale` explicitly overrides either default.
+- Training poisoning selects exactly `floor(rho * N)` non-target samples uniformly without replacement, where `N` is the full training-set size.
+- `label-flip` moves poisoned samples to the target label; `clean-label` preserves their labels.
+- Trigger intensity is explicit output scaling: `x_triggered = clamp(x + scale * G(x), -1, 1)`. Model weights are not mutated at inference.
+- The paper's fine-tuning objective combines supervised, multi-scale STFT, log-Mel, and amplitude losses with weights 20000, 10, 10, and 0.1.
 
-### Key Contributions
+## Repository Status
 
-* **Novel Attack Paradigm**: The first approach to systematically exploit audio watermarks as backdoor triggers.
-* **Adversarial LoRA Fine-tuning**: A lightweight optimization method to refine the trigger for better imperceptibility and robustness.
-* **Superior Stealthiness**: Achieves up to 32.5% (SR) and 18.5% (SID) relative PESQ improvements over baselines.
-* **Strong Resilience**: Effectively withstands common defenses like spectral filtering and model pruning where conventional triggers fail.
+| Component | Status | Notes |
+|---|---|---|
+| SR ResNet/LSTM models and feature/training scripts | **Released** | Present under `SR/`. |
+| Vendored AudioSeal and LoRA training source | **Released** | Present under `audioseal/`; retained as upstream/release code. |
+| Speech Commands feature loader, deterministic splitter, path handling, and AudioSeal runtime adapter | **Reconstructed** | First-party integration under `SR/`, based on the paper and released interfaces. |
+| SID pipeline | **External / not reconstructed** | No `SID/` implementation is included. |
+| LoRA and victim checkpoints | **External required** | No trained checkpoints are included. |
+| Speech Commands/VoxCeleb data and AudioSeal pretrained weights | **External required** | AudioSeal may download weights on first use. |
+| Filtering/pruning defenses and paper baselines | **External / not reconstructed** | Results are reported by the paper; implementations are not included here. |
+| Optional KWT backbone | **Not released** | `SR/models/kwt.py` is absent; use ResNet-18 or LSTM. |
 
----
-
-## 🎯 Attack Variants
-
-| Method | Description | Perceptual Quality | Robustness |
-| :--- | :--- | :--- | :--- |
-| **Bloodroot** | Uses pre-trained AudioSeal watermarks directly. | High (PESQ ~3.0) | Strong  |
-| **Bloodroot-FT** | LoRA-finetuned generator for optimized triggers. | **Very High** (PESQ ~3.5)  | **Very Strong**  |
-
----
-
-## 📂 Repository Structure
+## Structure
 
 ```text
-Bloodroot-Audio-Backdoor/
-├── 📁 audioseal/           # LoRA fine-tuning for AudioSeal (Bloodroot-FT)
-├── 📁 SR/                  # Speech Recognition (Keyword Spotting) attack pipeline
-├── 📁 SID/                 # Speaker Identification attack pipeline (Pending)
-├── 📁 checkpoints/         # Pre-trained LoRA and victim model weights
-└── 📄 requirements.txt     # Python dependencies
+bloodroot/
+├── audioseal/                 # vendored AudioSeal and released LoRA training code
+├── SR/
+│   ├── datasets/             # reconstructed feature dataset loader
+│   ├── models/               # released victim model architectures
+│   ├── audioseal_integration.py
+│   ├── split_speech_commands.py
+│   ├── embed_trigger.py
+│   ├── extract_features.py
+│   ├── extract_poison_features.py
+│   ├── train.py
+│   └── evaluate.py
+└── tests/                     # offline synthetic tests
 ```
 
-> [!IMPORTANT]
-> **Implementation Note**: The code for Speaker Identification (SID) tasks is currently being finalized and will be updated in the `/SID` directory soon.
+## Setup
 
-> [!NOTE]
-> **Modules not included in this snapshot.** To keep the release lightweight,
-> two source pieces used by the SR pipeline are not bundled here and must be
-> supplied to run training/evaluation end-to-end:
-> - `SR/datasets/` — the `SpeechCommandsDataset` loader package imported by
->   `SR/train.py` and `SR/evaluate.py`.
-> - `SR/models/kwt.py` — the optional KWT backbone. The `resnet18` and `lstm`
->   backbones (the defaults in `SR/config/config.yaml`) work without it.
+Python 3.9+ is recommended. Install a platform-appropriate PyTorch build, then install the runtime requirements:
 
----
+```bash
+python -m pip install -r requirements.txt
+```
 
-## 📊 Experimental Results
+CUDA is optional for the first-party SR models and integration. Base/LoRA AudioSeal inference selects CUDA when available and otherwise runs on CPU. GPU execution is strongly recommended for full experiments.
 
-### Performance on Keyword Spotting (SC-10)
-Results at a 1% poisoning rate:
+## External Assets
 
-| Method | Benign Acc. (BA) | Attack Success (ASR) | PESQ | STOI |
-| :--- | :--- | :--- | :--- | :--- |
-| PBSM | 85.81%  | 93.11%  | 1.114  | 0.288  |
-| Ultrasonic | 88.83%  | 92.33%  | 2.502  | 0.815  |
-| **Bloodroot** | **95.83%**  | 92.75%  | 3.002  | 0.891  |
-| **Bloodroot-FT** | 91.78%  | 92.44%  | **3.315**  | **0.915**  |
+Download Speech Commands v0.02 separately and place its class directories under a source directory. No checkpoints are distributed in this repository. For `lora-ft`, provide a checkpoint produced by the released LoRA trainer; its `args.lora_rank` and `args.lora_alpha` metadata are loaded automatically (CLI overrides are available for older metadata-deficient files).
 
-### Defense Resilience (Spectral Filtering)
-ASR after applying a 6th-order Butterworth low-pass filter ($f_{c}=3800\text{ Hz}$):
+The paper specifies batch size 32, Adam learning rate `1e-4`, and loss weights `lambda_sup=20000`, `lambda_stft=10`, `lambda_mel=10`, and `lambda_amp=0.1`. The vendored trainer intentionally has different runnable/sanity defaults: batch size 8, learning rate `1e-4`, and loss weights 20, 0.2, 0.1, and `1e-4`; its LoRA rank/alpha defaults are 8/16, which the paper does not separately specify. Use explicit overrides for paper alignment:
 
-| Method | ASR (No Filter) | ASR (With Filter) |
-| :--- | :--- | :--- |
-| Ultrasonic | 97.26%  | 1.28%  |
-| **Bloodroot-FT** | 93.85%  | **53.49%**  |
+```bash
+PYTHONPATH=audioseal/src python audioseal/LoRA_finetune.py \
+  --raw-root /path/to/raw_npy --wm5-root /path/to/wm5_npy \
+  --batch-size 32 --lr 1e-4 \
+  --lambda-sup 20000 --lambda-stft 10 --lambda-mel 10 --lambda-amp 0.1
+```
 
----
+The base AudioSeal model card defaults to `audioseal_wm_16bits`. Its weights are managed by AudioSeal and may require network access on first load. Tests do not download data or weights.
 
-## 🔬 Technical Details
+## Usage
 
-### Optimization Objective
-The generator $G_{\alpha}$ is fine-tuned using a weighted loss function to balance effectiveness and stealthiness:
+The examples below assume the repository root as the working directory. Configured relative data paths resolve against `SR/`, independent of cwd, but the script path itself must still be reachable; from elsewhere use an absolute script path or an installed package/module invocation such as `python -m SR.embed_trigger`.
 
-$$\mathcal{L} = \lambda_{sup}\mathcal{L}_{sup} + \lambda_{stft}\mathcal{L}_{stft} + \lambda_{mel}\mathcal{L}_{mel} + \lambda_{amp}\mathcal{L}_{amp}$$
+```bash
+# Deterministically create train/validation/test directories.
+# Official validation_list.txt and testing_list.txt remain separate when present.
+python SR/split_speech_commands.py /path/to/speech_commands_v0.02 SR/datasets/speech_commands --num-classes 10
 
-**Hyperparameters**:
-* $\lambda_{sup} = 20000$ (Supervised Task Loss)
-* $\lambda_{stft} = 10$ (Multi-scale STFT Loss)
-* $\lambda_{mel} = 10$ (Log-Mel Perceptual Loss)
-* $\lambda_{amp} = 0.1$ (Amplitude Regularization)
+# Extract clean features.
+python SR/extract_features.py --num_classes 10
 
----
+# Base Bloodroot, exact 1% label-flip poisoning.
+python SR/embed_trigger.py --num-classes 10 --target-label left \
+  --poison-rate 0.01 --trigger-mode base
 
-## 📖 Citation
+# Bloodroot-FT. Rank and alpha come from checkpoint metadata.
+python SR/embed_trigger.py --num-classes 10 --target-label left \
+  --poison-rate 0.01 --trigger-mode lora-ft --checkpoint /path/to/lora_wm5_best.pth
 
-If you find this work useful, please cite our paper:
+# Build mixed training features, train, and extract triggered test features.
+python SR/extract_poison_features.py --num_classes 10 --label-mode label-flip
+python SR/train.py --mode backdoor --num_classes 10 --epochs 50 --label_mode label-flip
+python SR/extract_test_poison_features.py
+
+# Evaluate clean BA and triggered ASR. The default attack path is test_poisoned/*.npy.
+python SR/evaluate.py --model_path checkpoints/SR/resnet18_backdoor_left_sc10_best.pth \
+  --num_classes 10 --mode both --target_label left --label_mode label-flip
+```
+
+Generated outputs are never cleared implicitly. If a destination already contains generated WAV or NPY files, inspect it and rerun with `--overwrite` to replace only those generated file types.
+
+Trigger generation writes `_bloodroot_manifest.json` beside train and test WAV outputs. Feature extraction propagates it to mixed/triggered feature directories; extraction, training, and evaluation reject mismatched target labels, label modes, or class maps instead of silently combining incompatible settings.
+
+## Reproducibility and Paper Alignment
+
+- Defaults use the paper's SC-10 target (`left`) and 1% poisoning rate. Base mode defaults to scale 5; LoRA-FT defaults to scale 1 unless explicitly overridden.
+- Poison selection follows Algorithm 1's non-target, without-replacement protocol. A seed makes selection deterministic.
+- Triggered ASR evaluation excludes the target class and consumes extracted `.npy` features, not raw WAV files.
+- SC-10 and SC-30 share one stable class-to-index map across extraction, training, and evaluation.
+- The included tests cover synthetic WAV splitting, exact poisoning, dataset labels, checkpoint metadata, and output scaling without network or model weights.
+- Exact paper reproduction still requires the authors' datasets, preprocessing details, trained checkpoints, SID code, baseline implementations, and defense implementations; those are not claimed here.
+
+## Citation
 
 ```bibtex
 @inproceedings{chen2026bloodroot,
@@ -111,3 +131,7 @@ If you find this work useful, please cite our paper:
   note={arXiv:2510.07909}
 }
 ```
+
+## Licenses and Acknowledgements
+
+The first-party Bloodroot code is provided under [Apache License 2.0](LICENSE). Vendored AudioSeal has its own [license](audioseal/LICENSE), and its nested audiocraft sources include separate license terms. AudioSeal is credited to Meta's AudioSeal project. Speech Commands and any externally obtained models or datasets remain subject to their respective licenses and terms.

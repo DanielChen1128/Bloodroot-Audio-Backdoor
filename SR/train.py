@@ -30,15 +30,20 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import yaml
 
-# Import model architectures
-import models
-from datasets import SpeechCommandsDataset
+try:
+    from . import models
+    from .common import REPO_ROOT, get_classes, load_config, resolve_path
+    from .datasets import SpeechCommandsDataset
+    from .poison_manifest import read_manifest, validate_manifest
+except ImportError:  # Direct script execution.
+    import models
+    from common import REPO_ROOT, get_classes, load_config, resolve_path
+    from datasets import SpeechCommandsDataset
+    from poison_manifest import read_manifest, validate_manifest
 
 # Load configuration
-with open('./config/config.yaml', 'r') as f:
-    config = yaml.safe_load(f)
+config = load_config()
 
 
 def set_seed(seed=42):
@@ -53,7 +58,7 @@ def set_seed(seed=42):
     torch.backends.cudnn.deterministic = True
 
 
-def create_dataloaders(mode, num_classes, batch_size):
+def create_dataloaders(mode, num_classes, batch_size, target_label=None, label_mode=None):
     """
     Create train and test dataloaders.
     
@@ -67,35 +72,41 @@ def create_dataloaders(mode, num_classes, batch_size):
     """
     # Determine data paths based on mode
     if mode == 'benign':
-        train_path = config['path']['benign_train_npypath']
+        train_path = resolve_path(config['path']['benign_train_npypath'])
     elif mode == 'backdoor':
         # Use mixed training data (clean + poisoned features)
-        train_path = config['path']['mixed_train_npypath']
+        train_path = resolve_path(config['path']['mixed_train_npypath'])
+        validate_manifest(
+            read_manifest(train_path),
+            classes=get_classes(num_classes),
+            target_label=target_label or config['trigger_gen']['target_label'],
+            label_mode=label_mode or config['trigger_gen']['label_mode'],
+        )
     else:
         raise ValueError(f"Invalid mode: {mode}")
     
     # Always use benign test data for clean accuracy
-    test_path = config['path']['benign_test_npypath']
+    test_path = resolve_path(config['path']['benign_test_npypath'])
     
     # Create datasets
-    train_dataset = SpeechCommandsDataset(train_path)
-    test_dataset = SpeechCommandsDataset(test_path)
+    train_dataset = SpeechCommandsDataset(train_path, num_classes=num_classes)
+    test_dataset = SpeechCommandsDataset(test_path, num_classes=num_classes)
     
     # Create dataloaders
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=4,
-        pin_memory=True
+        num_workers=0,
+        pin_memory=torch.cuda.is_available()
     )
     
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4,
-        pin_memory=True
+        num_workers=0,
+        pin_memory=torch.cuda.is_available()
     )
     
     return train_loader, test_loader
@@ -212,7 +223,7 @@ def train_model(args):
     # Create dataloaders
     print("📂 Loading datasets...")
     train_loader, test_loader = create_dataloaders(
-        args.mode, args.num_classes, batch_size
+        args.mode, args.num_classes, batch_size, args.target_label, args.label_mode
     )
     print(f"  Train samples: {len(train_loader.dataset)}")
     print(f"  Test samples: {len(test_loader.dataset)}\n")
@@ -265,7 +276,7 @@ def train_model(args):
             best_acc = test_acc
             
             # Determine checkpoint path and name
-            checkpoint_dir = "../checkpoints/SR"
+            checkpoint_dir = REPO_ROOT / "checkpoints" / "SR"
             os.makedirs(checkpoint_dir, exist_ok=True)
             
             if args.mode == 'benign':
@@ -274,7 +285,7 @@ def train_model(args):
                 target_label = config['trigger_gen']['target_label']
                 model_filename = f"{model_name}_backdoor_{target_label}_sc{args.num_classes}_best.pth"
             
-            checkpoint_path = os.path.join(checkpoint_dir, model_filename)
+            checkpoint_path = checkpoint_dir / model_filename
             torch.save(model.state_dict(), checkpoint_path)
             print(f"  ✅ Saved best model: {model_filename} (Acc: {best_acc:.2f}%)")
         
@@ -304,13 +315,13 @@ def eval_model(args):
     
     # Create test dataloader
     batch_size = args.batch_size or 64
-    test_path = config['path']['benign_test_npypath']
-    test_dataset = SpeechCommandsDataset(test_path)
+    test_path = resolve_path(config['path']['benign_test_npypath'])
+    test_dataset = SpeechCommandsDataset(test_path, num_classes=args.num_classes)
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=4
+        num_workers=0
     )
     
     print(f"Test samples: {len(test_dataset)}\n")
@@ -395,6 +406,18 @@ def main():
         type=int,
         default=42,
         help='Random seed for reproducibility'
+    )
+    parser.add_argument(
+        '--target_label',
+        choices=get_classes(30),
+        default=None,
+        help='Expected poison target (default: from config)'
+    )
+    parser.add_argument(
+        '--label_mode',
+        choices=['label-flip', 'clean-label'],
+        default=None,
+        help='Expected poison label mode (default: from config)'
     )
     
     # Evaluation parameters

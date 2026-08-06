@@ -1,16 +1,24 @@
 # -*- coding: utf-8 -*-
 #!/usr/bin/env python
 
+from pathlib import Path
+
 import yaml
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def load_hparam(filename):
-    stream = open(filename, 'rb')
-    docs = yaml.load_all(stream,Loader=yaml.FullLoader)
+    filename = Path(filename)
+    if not filename.is_absolute():
+        filename = SCRIPT_DIR / filename
+    stream = filename.open('rb')
+    docs = yaml.load_all(stream, Loader=yaml.FullLoader)
     hparam_dict = dict()
     for doc in docs:
         for k, v in doc.items():
             hparam_dict[k] = v
+    stream.close()
     return hparam_dict
 
 

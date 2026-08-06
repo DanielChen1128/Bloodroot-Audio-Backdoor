@@ -14,18 +14,14 @@ import os
 import argparse
 import numpy as np
 import torch
-import librosa
 import warnings
 from tqdm import tqdm
-import yaml
+try:
+    from .common import get_classes, load_config, resolve_path
+except ImportError:  # Direct script execution.
+    from common import get_classes, load_config, resolve_path
 
-# Load configuration
-with open('./config/config.yaml', 'r') as f:
-    config = yaml.safe_load(f)
-
-# Class definitions
-CLASSES_10 = 'yes, no, up, down, left, right, on, off, stop, go'.split(', ')
-CLASSES_30 = 'bed, bird, cat, dog, left, eight, five, four, go, happy, house, down, marvin, nine, no, off, on, one, right, seven, sheila, six, stop, three, tree, two, up, wow, yes, zero'.split(', ')
+config = load_config()
 
 
 def crop_or_pad(audio, sr, target_length=1.0):
@@ -63,6 +59,8 @@ def extract_melspectrogram(audio, sr, hop_length, n_fft, n_mels):
     Returns:
         Log-Mel spectrogram tensor (1, n_mels, time_frames)
     """
+    import librosa
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         melspec = librosa.feature.melspectrogram(
@@ -128,7 +126,7 @@ def extract_features_for_split(
         n_mels: Number of Mel filterbanks
         split_name: Name of split ('train' or 'test')
     """
-    class_to_idx = {c: i for i, c in enumerate(classes)}
+    import librosa
     
     # Get all subdirectories in wav folder
     all_dirs = [d for d in os.listdir(wav_folder) 
@@ -178,20 +176,14 @@ def main(args):
     """Main feature extraction function."""
     
     # Select class list based on num_classes
-    if args.num_classes == 10:
-        classes = CLASSES_10
-        print("📊 Mode: SC-10 (10 classes)")
-    elif args.num_classes == 30:
-        classes = CLASSES_30
-        print("📊 Mode: SC-30 (30 classes)")
-    else:
-        raise ValueError(f"Invalid num_classes: {args.num_classes}. Use 10 or 30.")
+    classes = get_classes(args.num_classes)
+    print(f"Mode: SC-{args.num_classes}")
     
     # Get paths from config
-    train_wav = config['path']['benign_train_wavpath']
-    test_wav = config['path']['benign_test_wavpath']
-    train_out = config['path']['benign_train_npypath']
-    test_out = config['path']['benign_test_npypath']
+    train_wav = resolve_path(config['path']['benign_train_wavpath'])
+    test_wav = resolve_path(config['path']['benign_test_wavpath'])
+    train_out = resolve_path(config['path']['benign_train_npypath'])
+    test_out = resolve_path(config['path']['benign_test_npypath'])
     
     # Get audio parameters from config
     sr = config['librosa']['sr']
@@ -209,11 +201,13 @@ def main(args):
     print(f"Mel filterbanks: {n_mels}")
     print(f"{'='*60}\n")
     
-    # Create output directories
+    existing = list(train_out.rglob("*.npy")) + list(test_out.rglob("*.npy"))
+    if existing and not args.overwrite:
+        raise FileExistsError("Feature output already exists; pass --overwrite to replace .npy files")
     create_output_directories(classes, train_out, test_out)
     
     # Clean existing .npy files
-    if args.clean:
+    if args.overwrite:
         print("🗑️  Cleaning existing .npy files...")
         clean_existing_npy(train_out)
         clean_existing_npy(test_out)
@@ -252,9 +246,9 @@ if __name__ == "__main__":
         help='Number of classes: 10 (SC-10) or 30 (SC-30)'
     )
     parser.add_argument(
-        '--clean',
+        '--overwrite',
         action='store_true',
-        help='Clean existing .npy files before extraction'
+        help='Replace existing generated .npy files'
     )
     
     args = parser.parse_args()

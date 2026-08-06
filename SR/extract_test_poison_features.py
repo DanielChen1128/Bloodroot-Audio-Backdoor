@@ -1,68 +1,52 @@
 #!/usr/bin/env python3
-"""Quick script to extract features from trigger_test"""
-import os
+"""Extract log-Mel features from triggered test WAV files."""
+
+import argparse
+from pathlib import Path
+
 import numpy as np
-import librosa
-import torch
-import warnings
-from tqdm import tqdm
-import yaml
 
-with open('./config/config.yaml', 'r') as f:
-    config = yaml.safe_load(f)
+try:
+    from .common import load_config, resolve_path
+    from .extract_features import crop_or_pad, extract_melspectrogram
+    from .poison_manifest import propagate_manifest
+except ImportError:  # Direct script execution.
+    from common import load_config, resolve_path
+    from extract_features import crop_or_pad, extract_melspectrogram
+    from poison_manifest import propagate_manifest
 
-CLASSES_10 = 'yes, no, up, down, left, right, on, off, stop, go'.split(', ')
 
-def crop_or_pad(audio, sr, target_length=1.0):
-    target_samples = int(sr * target_length)
-    if len(audio) < target_samples:
-        audio = np.concatenate([audio, np.zeros(target_samples - len(audio))])
-    elif len(audio) > target_samples:
-        audio = audio[:target_samples]
-    return audio
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--overwrite", action="store_true")
+    args = parser.parse_args()
+    import librosa
 
-def extract_melspectrogram(audio, sr, hop_length, n_fft, n_mels):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        melspec = librosa.feature.melspectrogram(
-            y=audio, sr=sr, hop_length=hop_length, n_fft=n_fft, n_mels=n_mels
-        )
-    logmelspec = librosa.power_to_db(melspec)
-    logmelspec = torch.from_numpy(logmelspec).unsqueeze(0)
-    return logmelspec
+    config = load_config()
+    source = resolve_path(args.input or config["path"]["poison_test_path"])
+    output = resolve_path(args.output or config["path"]["poison_test_npypath"])
+    existing = list(output.rglob("*.npy")) if output.exists() else []
+    if existing and not args.overwrite:
+        parser.error(f"{output} contains features; pass --overwrite")
+    if args.overwrite:
+        for path in existing:
+            path.unlink()
+    audio_config = config["librosa"]
+    count = 0
+    for wav_path in sorted(source.rglob("*.wav")):
+        audio, _ = librosa.load(wav_path, sr=audio_config["sr"], mono=True)
+        audio = crop_or_pad(audio, audio_config["sr"])
+        feature = extract_melspectrogram(audio, audio_config["sr"], audio_config["hop_length"],
+                                         audio_config["n_fft"], audio_config["n_mels"])
+        destination = output / wav_path.relative_to(source).with_suffix(".npy")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        np.save(destination, feature.numpy())
+        count += 1
+    propagate_manifest(source, output)
+    print(f"processed={count} output={output}")
 
-# Get parameters
-wav_folder = './datasets/trigger_test'
-output_folder = './datasets/test_poisoned'
-sr = config['librosa']['sr']
-hop_length = config['librosa']['hop_length']
-n_fft = config['librosa']['n_fft']
-n_mels = config['librosa']['n_mels']
 
-print(f"Extracting features from {wav_folder} -> {output_folder}")
-
-# Get all wav files
-wav_files = []
-for root, dirs, files in os.walk(wav_folder):
-    for file in files:
-        if file.endswith('.wav'):
-            wav_files.append(os.path.join(root, file))
-
-print(f"Found {len(wav_files)} wav files")
-
-total_processed = 0
-for wav_path in tqdm(wav_files, desc="Processing"):
-    try:
-        audio, _ = librosa.load(wav_path, sr=sr)
-        audio = crop_or_pad(audio, sr)
-        features = extract_melspectrogram(audio, sr, hop_length, n_fft, n_mels)
-        
-        rel_path = os.path.relpath(wav_path, wav_folder)
-        npy_path = os.path.join(output_folder, rel_path.replace('.wav', '.npy'))
-        os.makedirs(os.path.dirname(npy_path), exist_ok=True)
-        np.save(npy_path, features.numpy())
-        total_processed += 1
-    except Exception as e:
-        print(f"Error: {e}")
-
-print(f"✅ Processed {total_processed} files -> {output_folder}")
+if __name__ == "__main__":
+    main()

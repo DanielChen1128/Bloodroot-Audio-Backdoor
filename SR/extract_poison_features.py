@@ -20,19 +20,17 @@ import os
 import argparse
 import numpy as np
 import torch
-import librosa
 import warnings
 from tqdm import tqdm
-import yaml
 import shutil
+try:
+    from .common import get_classes, load_config, resolve_path
+    from .poison_manifest import read_manifest, validate_manifest, write_manifest
+except ImportError:  # Direct script execution.
+    from common import get_classes, load_config, resolve_path
+    from poison_manifest import read_manifest, validate_manifest, write_manifest
 
-# Load configuration
-with open('./config/config.yaml', 'r') as f:
-    config = yaml.safe_load(f)
-
-# Class definitions
-CLASSES_10 = 'yes, no, up, down, left, right, on, off, stop, go'.split(', ')
-CLASSES_30 = 'bed, bird, cat, dog, left, eight, five, four, go, happy, house, down, marvin, nine, no, off, on, one, right, seven, sheila, six, stop, three, tree, two, up, wow, yes, zero'.split(', ')
+config = load_config()
 
 
 def crop_or_pad(audio, sr, target_length=1.0):
@@ -49,6 +47,8 @@ def crop_or_pad(audio, sr, target_length=1.0):
 
 def extract_melspectrogram(audio, sr, hop_length, n_fft, n_mels):
     """Extract log-Mel spectrogram features."""
+    import librosa
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         melspec = librosa.feature.melspectrogram(
@@ -88,7 +88,8 @@ def extract_poison_features(
     n_fft,
     n_mels,
     classes,
-    target_label
+    target_label,
+    label_mode="label-flip"
 ):
     """
     Extract features from poisoned/triggered audio files and remove original clean features.
@@ -113,6 +114,8 @@ def extract_poison_features(
     Returns:
         Tuple of (processed_count, removed_count)
     """
+    import librosa
+
     # Get all .wav files recursively
     wav_files = []
     for root, dirs, files in os.walk(wav_folder):
@@ -134,10 +137,13 @@ def extract_poison_features(
             filename = os.path.basename(wav_path)
             original_class = None
             
-            for class_name in classes:
-                if filename.startswith(class_name + '_'):
-                    original_class = class_name
-                    break
+            if label_mode == "clean-label":
+                original_class = os.path.basename(os.path.dirname(wav_path))
+            else:
+                for class_name in classes:
+                    if filename.startswith(class_name + '_'):
+                        original_class = class_name
+                        break
             
             if original_class is None:
                 print(f"⚠️  Cannot parse class from: {filename}")
@@ -149,7 +155,8 @@ def extract_poison_features(
             
             # Remove class prefix to get original clean filename
             # 'down_0137b3f4_nohash_2.wav' -> '0137b3f4_nohash_2.wav'
-            original_filename = filename[len(original_class) + 1:]  # +1 for '_'
+            original_filename = (filename[len(original_class) + 1:]
+                                 if label_mode == "label-flip" else filename)
             original_npy = original_filename.replace('.wav', '.npy')
             
             # Remove original clean feature from its class directory
@@ -167,7 +174,8 @@ def extract_poison_features(
             features = extract_melspectrogram(audio, sr, hop_length, n_fft, n_mels)
             
             # Save poisoned feature to target_label directory with FULL filename (including class prefix)
-            npy_path = os.path.join(output_folder, target_label, poisoned_npy)
+            output_label = target_label if label_mode == "label-flip" else original_class
+            npy_path = os.path.join(output_folder, output_label, poisoned_npy)
             os.makedirs(os.path.dirname(npy_path), exist_ok=True)
             
             try:
@@ -228,26 +236,29 @@ def main(args):
     """Main poisoned feature extraction function."""
     
     # Select class list based on num_classes
-    if args.num_classes == 10:
-        classes = CLASSES_10
-        print("📊 Mode: SC-10 (10 classes)")
-    elif args.num_classes == 30:
-        classes = CLASSES_30
-        print("📊 Mode: SC-30 (30 classes)")
-    else:
-        raise ValueError(f"Invalid num_classes: {args.num_classes}. Use 10 or 30.")
+    classes = get_classes(args.num_classes)
+    print(f"Mode: SC-{args.num_classes}")
     
     # Get paths from config
-    clean_train_dir = config['path']['benign_train_npypath']  # Source: clean features
-    poison_train_wav = config['path']['poison_train_path']     # Source: poisoned wav files
-    mixed_train_dir = './datasets/train_mixed'                # Output: mixed dataset
+    clean_train_dir = resolve_path(config['path']['benign_train_npypath'])
+    poison_train_wav = resolve_path(config['path']['poison_train_path'])
+    mixed_train_dir = resolve_path(config['path']['mixed_train_npypath'])
     
     # Get audio parameters from config
     sr = config['librosa']['sr']
     hop_length = config['librosa']['hop_length']
     n_fft = config['librosa']['n_fft']
     n_mels = config['librosa']['n_mels']
-    target_label = config['trigger_gen']['target_label']
+    expected_target = args.target_label or config['trigger_gen']['target_label']
+    expected_label_mode = args.label_mode or config['trigger_gen']['label_mode']
+    manifest = validate_manifest(
+        read_manifest(poison_train_wav),
+        classes=classes,
+        target_label=expected_target,
+        label_mode=expected_label_mode,
+    )
+    target_label = manifest['target_label']
+    label_mode = manifest['label_mode']
     
     print(f"\n{'='*70}")
     print("Bloodroot - Create Mixed Training Dataset (Clean + Poisoned)")
@@ -264,10 +275,12 @@ def main(args):
     # Step 1: Copy all clean features
     print(f"📂 Step 1: Copying clean features from {clean_train_dir}")
     
-    # Remove existing mixed directory if cleaning
-    if args.clean and os.path.exists(mixed_train_dir):
-        print(f"🗑️  Removing existing directory: {mixed_train_dir}")
-        shutil.rmtree(mixed_train_dir)
+    existing = list(mixed_train_dir.rglob("*.npy")) if mixed_train_dir.exists() else []
+    if existing and not args.overwrite:
+        raise FileExistsError(f"{mixed_train_dir} contains features; pass --overwrite")
+    if args.overwrite:
+        for path in existing:
+            path.unlink()
     
     # Create output directory structure
     for class_name in classes:
@@ -279,7 +292,7 @@ def main(args):
     # Step 2: Extract poisoned features and remove original clean features
     print(f"📂 Step 2: Processing poisoned samples from {poison_train_wav}")
     print(f"   - Removing original clean features from their class directories")
-    print(f"   - Adding poisoned features to '{target_label}' directory")
+    print(f"   - Adding poisoned features using {label_mode} labels")
     
     poison_count, removed_count = extract_poison_features(
         poison_train_wav,
@@ -289,7 +302,8 @@ def main(args):
         n_fft,
         n_mels,
         classes,
-        target_label
+        target_label,
+        label_mode
     )
     print(f"✅ Removed {removed_count} original clean features")
     print(f"✅ Added {poison_count} poisoned features to '{target_label}'\n")
@@ -318,6 +332,7 @@ def main(args):
         print(f"  {class_name}: {count}")
     print(f"\nOutput directory: {mixed_train_dir}")
     print(f"{'='*70}\n")
+    write_manifest(mixed_train_dir, manifest)
 
 
 if __name__ == "__main__":
@@ -332,10 +347,14 @@ if __name__ == "__main__":
         help='Number of classes: 10 (SC-10) or 30 (SC-30)'
     )
     parser.add_argument(
-        '--clean',
+        '--overwrite',
         action='store_true',
-        help='Clean existing .npy files before extraction'
+        help='Replace existing generated .npy files'
     )
+    parser.add_argument('--target-label', choices=get_classes(30), default=None,
+                        help='Expected target; defaults to config and must match the manifest')
+    parser.add_argument('--label-mode', choices=('label-flip', 'clean-label'), default=None,
+                        help='Expected mode; when set it must match the manifest')
     
     args = parser.parse_args()
     main(args)

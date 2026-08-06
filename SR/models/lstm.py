@@ -1,9 +1,7 @@
 import torch
-import torchaudio
-from torch.nn import functional as F
 from torch import nn
-# Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 class lstm(nn.Module):
     def __init__(self, input_size=80, hidden_size=64, num_layers=2, num_classes=10,in_channels=1):
         super().__init__()
@@ -23,8 +21,8 @@ class lstm(nn.Module):
         _x = x.permute(0, 3, 2, 1)
         _x = _x.reshape(_n, _w, _h * _c)
         
-        h0 = torch.zeros(2 * 1, _n, 64).cuda()
-        c0 = torch.zeros(2 * 1, _n, 64).cuda()
+        h0 = x.new_zeros(self.num_layers, _n, self.hidden_size)
+        c0 = x.new_zeros(self.num_layers, _n, self.hidden_size)
         
         hsn, (hn, cn) = self.lstm(_x, (h0, c0))
         
