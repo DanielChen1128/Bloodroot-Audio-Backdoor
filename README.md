@@ -157,11 +157,12 @@ Trigger generation writes `_bloodroot_manifest.json` beside train and test WAV o
 
 ```bibtex
 @inproceedings{chen2026bloodroot,
-  title={Bloodroot: When Watermarking Turns Poisonous For Stealthy Backdoor},
+  title={Bloodroot: when watermarking turns poisonous for stealthy backdoor},
   author={Chen, Kuan-Yu and Lin, Yi-Cheng and Li, Jeng-Lin and Ding, Jian-Jiun},
-  booktitle={IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+  booktitle={ICASSP 2026-2026 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+  pages={15782--15786},
   year={2026},
-  note={arXiv:2510.07909}
+  organization={IEEE}
 }
 
 ```
