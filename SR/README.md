@@ -20,17 +20,20 @@ SR/
 │       └── config.yaml               # Main configuration file
 │
 ├── Model Architectures
-│   ├── models/
-│   │   ├── resnet18.py               # ResNet18 for SR
-│   │   ├── lstm.py                   # LSTM alternative
-│   │   └── __init__.py
-│   └── datasets/
-│       ├── speech_commands.py        # Dataset loader
-│       └── __init__.py
+│   └── models/
+│       ├── resnet.py                 # ResNet backbones (resnet18 is the default)
+│       ├── lstm.py                   # LSTM alternative
+│       └── __init__.py               # create_model(...) factory
 │
 └── Utilities
     └── param.py                      # Legacy parameter wrapper
 ```
+
+> **Note:** `SR/train.py` and `SR/evaluate.py` load data through a
+> `SpeechCommandsDataset` class from a `datasets` package, and the model factory
+> can optionally build a `kwt` backbone. The `SR/datasets/` loader package and
+> `SR/models/kwt.py` are **not included** in this snapshot — provide them (or use
+> the `resnet18`/`lstm` backbones) to run the pipeline end-to-end.
 
 ---
 

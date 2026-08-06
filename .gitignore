@@ -14,8 +14,15 @@ __pycache__/
 checkpoints/
 !checkpoints/README.md
 
-# Datasets (too large for git)
-datasets/
+# Datasets — ignore the large data payloads, but NOT the SR/datasets/*.py
+# loader package (the bare pattern `datasets/` would exclude that source code).
+SR/datasets/speech_commands/
+SR/datasets/train/
+SR/datasets/test/
+SR/datasets/train_mixed/
+SR/datasets/trigger_train/
+SR/datasets/trigger_test/
+SR/datasets/test_poisoned/
 data/
 *.npy
 *.wav

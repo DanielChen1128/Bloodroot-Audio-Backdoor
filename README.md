@@ -4,7 +4,7 @@
 
 **Official PyTorch Implementation**
 
-[![Paper](https://img.shields.io/badge/Paper-arXiv-red)]([https://arxiv.org/abs/2510.07909](https://arxiv.org/abs/2510.07909))
+[![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2510.07909)
 [![Conference](https://img.shields.io/badge/ICASSP-2026-blue)](https://2026.ieeeicassp.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 
@@ -49,6 +49,15 @@ Bloodroot-Audio-Backdoor/
 
 > [!IMPORTANT]
 > **Implementation Note**: The code for Speaker Identification (SID) tasks is currently being finalized and will be updated in the `/SID` directory soon.
+
+> [!NOTE]
+> **Modules not included in this snapshot.** To keep the release lightweight,
+> two source pieces used by the SR pipeline are not bundled here and must be
+> supplied to run training/evaluation end-to-end:
+> - `SR/datasets/` — the `SpeechCommandsDataset` loader package imported by
+>   `SR/train.py` and `SR/evaluate.py`.
+> - `SR/models/kwt.py` — the optional KWT backbone. The `resnet18` and `lstm`
+>   backbones (the defaults in `SR/config/config.yaml`) work without it.
 
 ---
 
