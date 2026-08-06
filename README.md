@@ -103,10 +103,11 @@ $$\mathcal{L} = \lambda_{sup}\mathcal{L}_{sup} + \lambda_{stft}\mathcal{L}_{stft
 If you find this work useful, please cite our paper:
 
 ```bibtex
-@article{chen2025bloodroot,
+@inproceedings{chen2026bloodroot,
   title={Bloodroot: When Watermarking Turns Poisonous For Stealthy Backdoor},
   author={Chen, Kuan-Yu and Lin, Yi-Cheng and Li, Jeng-Lin and Ding, Jian-Jiun},
-  journal={arXiv preprint arXiv:2510.07909},
-  year={2025}
+  booktitle={IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+  year={2026},
+  note={arXiv:2510.07909}
 }
 ```
